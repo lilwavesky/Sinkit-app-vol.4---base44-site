@@ -1,0 +1,2 @@
+-keep class ir.bestdroid.karen.** { *; }
+-dontwarn javax.annotation.**

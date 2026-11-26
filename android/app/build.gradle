@@ -1,0 +1,83 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+android {
+    namespace = "ir.bestdroid.karen"
+    compileSdk = 36
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        applicationId = "ir.bestdroid.karen"
+        minSdk = 21
+        targetSdk = 35
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            release {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Keep the real package id (ir.bestdroid.karen) for debug APKs as well.
+            debuggable = true
+        }
+        release {
+            // Never sign release builds with the debug keystore.
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.release
+            }
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+// Kotlin JVM target. The legacy `android { kotlinOptions { jvmTarget = ... } }` DSL is deprecated since
+// Kotlin 2.0 and is rejected by newer Kotlin Gradle Plugins; this project uses KGP 2.2.10 (see settings.gradle).
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def isReleaseTask = taskGraph.allTasks.any { task ->
+        task.name.toLowerCase().contains("release")
+    }
+    if (isReleaseTask && !hasReleaseKeystore) {
+        throw new GradleException(
+            "Release build blocked: android/key.properties is missing. " +
+            "Copy android/key.properties.example to android/key.properties and configure your release keystore. " +
+            "Never ship a release APK signed with the debug keystore."
+        )
+    }
+}
+
+flutter {
+    source = "../.."
+}

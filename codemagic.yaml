@@ -1,0 +1,187 @@
+workflows:
+  karen-next-android-debug:
+    name: KAREN NEXT - Android Debug APK
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      java: 17
+      vars:
+        # Drift guard: scripts/bootstrap_android_wrapper.sh fails (exit 2) if this differs from the version in
+        # android/gradle/wrapper/gradle-wrapper.properties.
+        GRADLE_VERSION: "9.3.1"
+        # Checksums (do not mix them up):
+        #  * android/gradle/wrapper/gradle-wrapper.properties carries distributionSha256Sum = SHA-256 of
+        #    gradle-9.3.1-ALL.zip, the archive the generated wrapper downloads. The bootstrap cross-checks it against
+        #    the checksum Gradle publishes for that exact archive before anything else happens, and the wrapper itself
+        #    enforces it on download.
+        #  * Optional: add a Codemagic environment variable GRADLE_BIN_DISTRIBUTION_SHA256 with the "binary-only"
+        #    checksum of gradle-9.3.1-BIN.zip (https://gradle.org/release-checksums/) to additionally pin the
+        #    generator archive that the bootstrap downloads. Not hard-coded: a mistyped value would fail with exit 4.
+    scripts:
+      - name: Locate project root
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [ -f "$CM_BUILD_DIR/pubspec.yaml" ]; then
+            APP_DIR="$CM_BUILD_DIR"
+          elif [ -f "$CM_BUILD_DIR/karen_next/pubspec.yaml" ]; then
+            APP_DIR="$CM_BUILD_DIR/karen_next"
+          else
+            echo "ERROR: pubspec.yaml not found at repository root or in ./karen_next."
+            find "$CM_BUILD_DIR" -maxdepth 4 -name pubspec.yaml -print || true
+            exit 1
+          fi
+          echo "APP_DIR=$APP_DIR" >> "$CM_ENV"
+          echo "KAREN project root: $APP_DIR"
+
+      - name: Toolchain report
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd "$APP_DIR"
+          mkdir -p build/reports
+          rm -f build/reports/status.env
+
+          FLUTTER_BIN="$(command -v flutter)"
+          FLUTTER_REAL="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$FLUTTER_BIN")"
+          FLUTTER_SDK="$(dirname "$(dirname "$FLUTTER_REAL")")"
+          ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$ANDROID_SDK" ]; then
+            echo "ERROR: ANDROID_SDK_ROOT and ANDROID_HOME are both unset."
+            exit 1
+          fi
+          printf 'flutter.sdk=%s\nsdk.dir=%s\n' "$FLUTTER_SDK" "$ANDROID_SDK" > android/local.properties
+
+          {
+            echo "== flutter --version =="; flutter --version
+            echo "== java -version ==";     java -version 2>&1
+            echo "== dart --version ==";    dart --version 2>&1
+            echo "== flutter doctor -v =="
+            flutter doctor -v || echo "NOTE: flutter doctor (informational) returned non-zero; iOS/desktop items are irrelevant here."
+          } 2>&1 | tee build/reports/toolchain.log
+
+      - name: Self-test of the Gradle wrapper bootstrap (offline, test double only)
+        script: |
+          #!/usr/bin/env bash
+          # Exercises scripts/bootstrap_android_wrapper.sh against a strict Gradle-9-like test double inside a temp
+          # directory. Result is recorded and enforced by the quality gate; it never writes into android/.
+          set -uo pipefail
+          cd "$APP_DIR"
+          mkdir -p build/reports
+          bash scripts/test_bootstrap_android_wrapper.sh 2>&1 | tee build/reports/wrapper_bootstrap_selftest.log
+          SELFTEST_RC=${PIPESTATUS[0]}
+          echo "SELFTEST_RC=$SELFTEST_RC" >> build/reports/status.env
+          echo "wrapper bootstrap self-test exit code: $SELFTEST_RC"
+          exit 0   # enforced by the final quality gate
+
+      - name: Generate official Gradle wrapper and verify gradlew
+        script: |
+          #!/usr/bin/env bash
+          # Downloads the official Gradle distribution, verifies its SHA-256, runs the real `gradle wrapper` task in a
+          # VALID temporary Gradle build, installs gradlew / gradlew.bat / gradle-wrapper.jar into android/, and checks
+          # that `./gradlew --version` reports the expected version. Idempotent; see the script header for exit codes.
+          set -euo pipefail
+          cd "$APP_DIR"
+          mkdir -p build/reports
+          bash scripts/bootstrap_android_wrapper.sh 2>&1 | tee build/reports/gradle_wrapper_bootstrap.log
+          ls -l android/gradlew android/gradlew.bat android/gradle/wrapper/gradle-wrapper.jar
+          (cd android && ./gradlew --version)
+
+      - name: Resolve dependencies
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd "$APP_DIR"
+          flutter pub get
+
+      - name: Analyze and test (results recorded and published, enforced by the final gate)
+        script: |
+          #!/usr/bin/env bash
+          set -uo pipefail
+          cd "$APP_DIR"
+          mkdir -p build/reports "$CM_BUILD_DIR/test-results"
+
+          # Infos (lint suggestions) are shown but do not fail; warnings and errors do.
+          flutter analyze --no-fatal-infos 2>&1 | tee build/reports/flutter_analyze.log
+          ANALYZE_RC=${PIPESTATUS[0]}
+
+          # One run covers both `flutter test` and `flutter test --coverage` (the latter is a superset).
+          # The JSON file reporter feeds Codemagic's test-results view (test_report below). If this Flutter version
+          # has no --file-reporter option, the tests still run (and are still enforced); only the JSON is missing.
+          if flutter test --help 2>&1 | grep -q -- '--file-reporter'; then
+            flutter test --coverage --reporter expanded \
+              --file-reporter "json:$CM_BUILD_DIR/test-results/flutter.json" 2>&1 | tee build/reports/flutter_test.log
+            TEST_RC=${PIPESTATUS[0]}
+          else
+            echo "NOTE: this Flutter version has no --file-reporter; running tests without the JSON test report."
+            flutter test --coverage --reporter expanded 2>&1 | tee build/reports/flutter_test.log
+            TEST_RC=${PIPESTATUS[0]}
+          fi
+
+          printf 'ANALYZE_RC=%s\nTEST_RC=%s\n' "$ANALYZE_RC" "$TEST_RC" >> build/reports/status.env
+          echo "flutter analyze exit code: $ANALYZE_RC"
+          echo "flutter test exit code:    $TEST_RC"
+          exit 0   # the gate step below fails the build; the APK is still built first
+        test_report: test-results/flutter.json
+
+      - name: Build debug APK
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd "$APP_DIR"
+          mkdir -p build/reports
+          flutter build apk --debug -v 2>&1 | tee build/reports/flutter_build_apk_debug.log
+          APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$APK_PATH"
+          unzip -tq "$APK_PATH" > /dev/null
+          ls -lh "$APK_PATH"
+
+          # The application ID must stay ir.bestdroid.karen (static check + check of the real APK when aapt2 exists).
+          if ! grep -q 'applicationId = "ir.bestdroid.karen"' android/app/build.gradle; then
+            echo "ERROR: applicationId in android/app/build.gradle is not ir.bestdroid.karen"; exit 1
+          fi
+          ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          AAPT2=""
+          if [ -n "$ANDROID_SDK" ] && [ -d "$ANDROID_SDK/build-tools" ]; then
+            for BT_DIR in "$ANDROID_SDK"/build-tools/*/; do
+              if [ -x "${BT_DIR}aapt2" ]; then AAPT2="${BT_DIR}aapt2"; fi   # any build-tools version can read badging
+            done
+          fi
+          if [ -n "$AAPT2" ]; then
+            BADGING="$("$AAPT2" dump badging "$APK_PATH" 2>/dev/null || true)"
+            PKG_LINE="$(printf '%s\n' "$BADGING" | grep -m 1 '^package:' || true)"
+            echo "$PKG_LINE"
+            case "$PKG_LINE" in
+              *"name='ir.bestdroid.karen'"*) echo "APK package id verified: ir.bestdroid.karen" ;;
+              *) echo "ERROR: the built APK does not have package id ir.bestdroid.karen"; exit 1 ;;
+            esac
+          else
+            echo "NOTE: aapt2 not found in the Android SDK build-tools; APK package id was checked statically only."
+          fi
+          echo "APK_BUILD_SUCCESS=$PWD/$APK_PATH"
+
+      - name: Quality gate (fails the build if analyze, tests or the bootstrap self-test failed)
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd "$APP_DIR"
+          # shellcheck disable=SC1091
+          source build/reports/status.env
+          echo "wrapper bootstrap self-test exit code: ${SELFTEST_RC:-missing}"
+          echo "flutter analyze exit code:             ${ANALYZE_RC:-missing}"
+          echo "flutter test exit code:                ${TEST_RC:-missing}"
+          if [ "${SELFTEST_RC:-1}" -ne 0 ] || [ "${ANALYZE_RC:-1}" -ne 0 ] || [ "${TEST_RC:-1}" -ne 0 ]; then
+            echo "QUALITY GATE FAILED: the APK was built, but a check failed. Do not treat this build as verified."
+            exit 1
+          fi
+          echo "QUALITY GATE PASSED"
+    artifacts:
+      - "**/build/app/outputs/flutter-apk/*.apk"
+      - "**/build/reports/**"
+      - "**/test-results/**"
+      - "**/coverage/lcov.info"
+      - "**/pubspec.lock"
+      - "**/android/gradlew"
+      - "**/android/gradlew.bat"
+      - "**/android/gradle/wrapper/gradle-wrapper.jar"

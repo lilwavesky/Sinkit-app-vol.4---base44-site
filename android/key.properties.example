@@ -1,0 +1,5 @@
+# Copy this file to android/key.properties (ignored by git) before running release builds.
+storePassword=CHANGE_ME_STORE_PASSWORD
+keyPassword=CHANGE_ME_KEY_PASSWORD
+keyAlias=karen_release
+storeFile=../keystore/karen-release.jks
