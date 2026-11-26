@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers/karen_providers.dart';
 import '../../app/theme/app_theme.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/models/karen_models.dart';
 import '../../core/utils/persian_utils.dart';
 import '../../core/widgets/karen_widgets.dart';
@@ -107,7 +108,7 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       drawer: const DeviceListDrawer(),
       appBar: AppBar(
-        title: const Text('کارن الکترونیک'),
+        title: const Text(AppConstants.appNameFa),
         leading: Builder(
           builder: (ctx) => IconButton(
             key: const Key('btn_open_drawer'),

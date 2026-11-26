@@ -12,80 +12,14 @@ class KarenLogoMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Image.asset(
+      'assets/branding/sinkit_logo.png',
       width: size,
       height: size,
-      child: CustomPaint(painter: _KarenLogoPainter()),
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
     );
   }
-}
-
-class _KarenLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width;
-    final bgRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, s, s),
-      Radius.circular(s * 0.22),
-    );
-    final bgPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF2A124C), Color(0xFF150929)],
-      ).createShader(Rect.fromLTWH(0, 0, s, s));
-    canvas.drawRRect(bgRect, bgPaint);
-
-    final kPaint = Paint()..color = const Color(0xFF8B5CF6);
-    final kPath = Path()
-      ..moveTo(s * 0.22, s * 0.20)
-      ..lineTo(s * 0.36, s * 0.20)
-      ..lineTo(s * 0.36, s * 0.42)
-      ..lineTo(s * 0.58, s * 0.20)
-      ..lineTo(s * 0.77, s * 0.20)
-      ..lineTo(s * 0.50, s * 0.46)
-      ..lineTo(s * 0.78, s * 0.80)
-      ..lineTo(s * 0.58, s * 0.80)
-      ..lineTo(s * 0.40, s * 0.56)
-      ..lineTo(s * 0.36, s * 0.60)
-      ..lineTo(s * 0.36, s * 0.80)
-      ..lineTo(s * 0.22, s * 0.80)
-      ..close();
-    canvas.drawPath(kPath, kPaint);
-
-    final plugPaint = Paint()..color = KarenColors.brandOrange;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.28, s * 0.54, s * 0.18, s * 0.14),
-        Radius.circular(s * 0.04),
-      ),
-      plugPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.32, s * 0.47, s * 0.032, s * 0.08),
-        Radius.circular(s * 0.015),
-      ),
-      plugPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.39, s * 0.47, s * 0.032, s * 0.08),
-        Radius.circular(s * 0.015),
-      ),
-      plugPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.355, s * 0.68, s * 0.036, s * 0.12),
-        Radius.circular(s * 0.018),
-      ),
-      plugPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class KarenCircuitBanner extends StatelessWidget {

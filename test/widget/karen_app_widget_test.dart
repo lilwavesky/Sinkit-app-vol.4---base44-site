@@ -206,7 +206,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('pin_input_field')), '2468');
     await tester.tap(find.byKey(const Key('btn_verify_pin')));
     await tester.pumpAndSettle();
-    expect(find.text('کارن الکترونیک'), findsOneWidget);
+    expect(find.text('Sinkit'), findsOneWidget);
   });
 
   testWidgets('a genuine PIN security-storage read failure keeps the app locked', (

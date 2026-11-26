@@ -1,6 +1,6 @@
 class AppConstants {
-  static const String appNameFa = 'کارن الکترونیک';
-  static const String appNameEn = 'Karen Electronic';
+  static const String appNameFa = 'Sinkit';
+  static const String appNameEn = 'Sinkit';
   static const String appPackageId = 'ir.bestdroid.karen';
   static const String appVersion = '2.2.0';
 

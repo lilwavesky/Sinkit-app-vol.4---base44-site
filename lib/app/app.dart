@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/constants/app_constants.dart';
 import 'providers/karen_providers.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
@@ -45,7 +46,7 @@ class _KarenNextAppState extends ConsumerState<KarenNextApp>
     );
 
     return MaterialApp.router(
-      title: 'کارن الکترونیک',
+      title: AppConstants.appNameEn,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(useGoogleFonts: widget.useGoogleFonts),
       darkTheme: AppTheme.dark(useGoogleFonts: widget.useGoogleFonts),

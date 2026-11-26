@@ -1,5 +1,5 @@
 name: karen_next
-description: Next-generation Persian RTL smart GSM controller application inspired by Karen Electronic (KAREN 1.0.0).
+description: Sinkit — Persian RTL smart GSM controller application, formerly KAREN Next (inspired by Karen Electronic 1.0.0).
 publish_to: 'none'
 version: 2.2.0+5
 

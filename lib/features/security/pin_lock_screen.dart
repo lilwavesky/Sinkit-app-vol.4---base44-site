@@ -130,7 +130,7 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
                         const KarenLogoMark(size: 72),
                         const SizedBox(height: 16),
                         const Text(
-                          'ورود امن به کارن الکترونیک',
+                          'ورود امن به Sinkit',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
